@@ -35,17 +35,4 @@ export class ScanError extends Error {
 export interface PresignResponse {
   /** URL pre-firmada para hacer PUT directo a S3. */
   uploadUrl: string;
-  /** Identificador del trabajo para consultar el resultado del procesamiento. */
-  jobId: string;
-}
-
-/** Respuesta al consultar el estado del procesamiento. */
-export interface ResultResponse {
-  status: "pending" | "done" | "error";
-  /** Texto plano extraído (presente cuando status === "done"). */
-  text?: string;
-  /** Código de error (presente cuando status === "error"). */
-  errorCode?: ScanErrorCode;
-  /** Mensaje legible del error. */
-  message?: string;
 }

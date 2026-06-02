@@ -1,20 +1,8 @@
 // Capa de servicio: encapsula la integración con AWS según el patrón de URLs
 // pre-firmadas (sección 2 del PRD). Incluye un modo simulado (mock) para poder
 // usar toda la interfaz sin un backend real.
-import {
-  ACCEPTED_MIME,
-  POLL_INTERVAL_MS,
-  PRESIGN_ENDPOINT,
-  PROCESSING_TIMEOUT_MS,
-  RESULT_ENDPOINT,
-  USE_MOCK,
-} from "./config";
-import {
-  PresignResponse,
-  ResultResponse,
-  ScanError,
-  ScanErrorCode,
-} from "./types";
+import { ACCEPTED_MIME, PRESIGN_ENDPOINT, USE_MOCK } from "./config";
+import { PresignResponse, ScanError } from "./types";
 import { mockPresign, mockUpload, mockResult } from "./mock";
 
 /** Callback de progreso de subida (0..100). */
@@ -24,21 +12,20 @@ export type ProgressCallback = (percent: number) => void;
  * Paso 2 del flujo: solicita una URL de subida temporal a la Lambda firmadora.
  */
 export async function requestPresignedUrl(
-  file: File,
+  fileName: string,
   signal: AbortSignal,
 ): Promise<PresignResponse> {
-  if (USE_MOCK) return mockPresign(file);
+  if (USE_MOCK) return mockPresign();
 
   let response: Response;
   try {
-    response = await fetch(PRESIGN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: ACCEPTED_MIME,
-        size: file.size,
-      }),
+    // La Lambda firmadora genera la URL pre-firmada de S3 y no requiere body.
+    // Devuelve { uploadUrl, key } y firma la cabecera `content-type`, por lo que
+    // el PUT posterior debe enviar exactamente `application/pdf` (ver uploadToS3).
+    const url = new URL(PRESIGN_ENDPOINT);
+    url.searchParams.set("fileName", fileName);
+    response = await fetch(url.toString(), {
+      method: "GET",
       signal,
     });
   } catch {
@@ -56,10 +43,11 @@ export async function requestPresignedUrl(
   }
 
   const data = (await response.json()) as Partial<PresignResponse>;
-  if (!data.uploadUrl || !data.jobId) {
+  console.log("Respuesta de presign", data);
+  if (!data.uploadUrl) {
     throw new ScanError("server", "Respuesta inválida del servidor.");
   }
-  return { uploadUrl: data.uploadUrl, jobId: data.jobId };
+  return { uploadUrl: data.uploadUrl };
 }
 
 /**
@@ -127,76 +115,14 @@ export function uploadToS3(
 }
 
 /**
- * Paso 4 y 5 del flujo: consulta el estado del procesamiento hasta obtener el
- * texto extraído, con un tiempo límite (RF-04: timeout).
+ * Paso final: obtiene el texto extraído del documento.
+ *
+ * El backend real no expone un endpoint de resultado, por lo que la subida a S3
+ * es el último paso del flujo real y esta función devuelve `null` (la UI muestra
+ * una confirmación de subida). En modo demostración se devuelve texto simulado
+ * para poder probar el visor de resultados.
  */
-export async function waitForResult(
-  jobId: string,
-  signal: AbortSignal,
-): Promise<string> {
+export function getExtractedText(signal: AbortSignal): Promise<string | null> {
   if (USE_MOCK) return mockResult(signal);
-
-  const deadline = Date.now() + PROCESSING_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    if (signal.aborted) throw new ScanError("unknown", "Proceso cancelado.");
-
-    const result = await fetchResult(jobId, signal);
-
-    if (result.status === "done" && typeof result.text === "string") {
-      return result.text;
-    }
-    if (result.status === "error") {
-      const code: ScanErrorCode = result.errorCode ?? "server";
-      throw new ScanError(
-        code,
-        result.message ?? "El procesamiento del documento falló.",
-      );
-    }
-
-    await delay(POLL_INTERVAL_MS, signal);
-  }
-
-  throw new ScanError(
-    "timeout",
-    "El procesamiento tardó demasiado. Inténtalo de nuevo con un archivo más pequeño.",
-  );
-}
-
-/** Consulta puntual del estado del trabajo. */
-async function fetchResult(
-  jobId: string,
-  signal: AbortSignal,
-): Promise<ResultResponse> {
-  let response: Response;
-  try {
-    const url = new URL(RESULT_ENDPOINT);
-    url.searchParams.set("jobId", jobId);
-    response = await fetch(url.toString(), { signal });
-  } catch {
-    throw new ScanError(
-      "network",
-      "Se perdió la conexión mientras se procesaba el documento.",
-    );
-  }
-
-  if (!response.ok) {
-    throw new ScanError("server", "El servidor devolvió un error al consultar el estado.");
-  }
-  return (await response.json()) as ResultResponse;
-}
-
-/** Espera `ms` milisegundos, cancelable mediante AbortSignal. */
-function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        reject(new ScanError("unknown", "Proceso cancelado."));
-      },
-      { once: true },
-    );
-  });
+  return Promise.resolve(null);
 }

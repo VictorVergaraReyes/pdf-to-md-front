@@ -16,22 +16,9 @@ export const ACCEPTED_MIME = "application/pdf";
 export const PRESIGN_ENDPOINT = process.env.NEXT_PUBLIC_PRESIGN_ENDPOINT ?? "";
 
 /**
- * Endpoint para consultar el estado del procesamiento (polling).
- * Recibe `?jobId=` y devuelve el texto extraído cuando termina.
- */
-export const RESULT_ENDPOINT = process.env.NEXT_PUBLIC_RESULT_ENDPOINT ?? "";
-
-/**
- * Modo simulado: activo cuando se fuerza por env o cuando faltan los endpoints.
- * Permite probar toda la interfaz sin un backend real.
+ * Modo simulado: activo cuando se fuerza por env o cuando falta el endpoint de
+ * firma. Permite probar toda la interfaz —incluido el visor de texto— sin un
+ * backend real.
  */
 export const USE_MOCK =
-  process.env.NEXT_PUBLIC_USE_MOCK === "true" ||
-  PRESIGN_ENDPOINT === "" ||
-  RESULT_ENDPOINT === "";
-
-/** Tiempo máximo (ms) de espera del procesamiento antes de marcar timeout (RF-04). */
-export const PROCESSING_TIMEOUT_MS = 60_000;
-
-/** Intervalo (ms) entre consultas de estado durante el procesamiento. */
-export const POLL_INTERVAL_MS = 2_000;
+  process.env.NEXT_PUBLIC_USE_MOCK == "true" || PRESIGN_ENDPOINT === "";

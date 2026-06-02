@@ -4,12 +4,9 @@
 import { PresignResponse, ScanError } from "./types";
 import type { ProgressCallback } from "./api";
 
-export function mockPresign(file: File): Promise<PresignResponse> {
+export function mockPresign(): Promise<PresignResponse> {
   return new Promise((resolve) =>
-    setTimeout(
-      () => resolve({ uploadUrl: "mock://s3", jobId: `mock-${file.size}` }),
-      400,
-    ),
+    setTimeout(() => resolve({ uploadUrl: "mock://s3" }), 400),
   );
 }
 
@@ -54,8 +51,8 @@ export function mockResult(signal: AbortSignal): Promise<string> {
 const SAMPLE_TEXT = `DOCUMENTO DE EJEMPLO — TEXTO EXTRAÍDO
 
 Este es un resultado simulado generado por el modo de demostración del
-PDF Scanner. Configura las variables de entorno NEXT_PUBLIC_PRESIGN_ENDPOINT
-y NEXT_PUBLIC_RESULT_ENDPOINT para conectar con el backend real en AWS.
+PDF Scanner. Configura la variable de entorno NEXT_PUBLIC_PRESIGN_ENDPOINT
+para conectar con el backend real en AWS.
 
 Resumen
 -------

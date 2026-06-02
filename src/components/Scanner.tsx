@@ -6,6 +6,7 @@ import { USE_MOCK } from "@/lib/config";
 import { FileDropzone } from "./FileDropzone";
 import { SelectedFileCard } from "./SelectedFileCard";
 import { ResultViewer } from "./ResultViewer";
+import { UploadSuccessCard } from "./UploadSuccessCard";
 import { ErrorBanner } from "./ErrorBanner";
 
 export function Scanner() {
@@ -16,8 +17,8 @@ export function Scanner() {
     <div className="space-y-5">
       {USE_MOCK && (
         <p className="rounded-lg border border-border bg-surface px-4 py-2 text-center text-xs text-muted">
-          Modo demostración: el procesamiento es simulado. Configura los
-          endpoints de AWS para usar el backend real.
+          Modo demostración: la subida y el resultado son simulados. Configura
+          el endpoint de AWS para usar el backend real.
         </p>
       )}
 
@@ -70,11 +71,19 @@ export function Scanner() {
         </>
       )}
 
-      {/* Resultado final. */}
+      {/* Resultado final con texto extraído (modo demostración). */}
       {status === "done" && text !== null && (
         <ResultViewer
           text={text}
           sourceName={file?.name ?? "documento.pdf"}
+          onReset={scanner.reset}
+        />
+      )}
+
+      {/* Confirmación de subida (flujo real, sin texto extraído). */}
+      {status === "done" && text === null && (
+        <UploadSuccessCard
+          fileName={file?.name ?? "documento.pdf"}
           onReset={scanner.reset}
         />
       )}

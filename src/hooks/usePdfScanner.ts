@@ -3,7 +3,8 @@
 // Hook que orquesta toda la máquina de estados del flujo de escaneo:
 // selección → subida (progreso) → procesamiento → resultado / error.
 import { useCallback, useRef, useState } from "react";
-import { requestPresignedUrl, uploadToS3, waitForResult } from "@/lib/api";
+import { getExtractedText, requestPresignedUrl, uploadToS3 } from "@/lib/api";
+import { USE_MOCK } from "@/lib/config";
 import { ScanError, ScanErrorCode, ScanStatus } from "@/lib/types";
 import { validatePdfFile } from "@/lib/validation";
 
@@ -66,7 +67,7 @@ export function usePdfScanner() {
     try {
       setState((s) => ({ ...s, status: "uploading", progress: 0, error: null }));
 
-      const { uploadUrl, jobId } = await requestPresignedUrl(file, signal);
+      const { uploadUrl } = await requestPresignedUrl(file.name, signal);
 
       await uploadToS3(
         uploadUrl,
@@ -75,9 +76,13 @@ export function usePdfScanner() {
         signal,
       );
 
-      setState((s) => ({ ...s, status: "processing" }));
+      // Solo el modo demostración simula una fase de procesamiento con texto
+      // extraído; en el flujo real la subida a S3 es el último paso.
+      if (USE_MOCK) {
+        setState((s) => ({ ...s, status: "processing" }));
+      }
 
-      const text = await waitForResult(jobId, signal);
+      const text = await getExtractedText(signal);
 
       setState((s) => ({ ...s, status: "done", text }));
     } catch (err) {
