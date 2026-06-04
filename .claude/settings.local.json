@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm --version)",
-      "Bash(npx --yes create-next-app@latest pdf-scanner-front --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --no-turbopack --use-npm)"
+      "Bash(npx --yes create-next-app@latest pdf-scanner-front --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --no-turbopack --use-npm)",
+      "Bash(node -e \"console.log\\(require\\('next/package.json'\\).version\\)\")",
+      "Bash(npm view *)",
+      "WebFetch(domain:opennext.js.org)"
     ]
   }
 }
