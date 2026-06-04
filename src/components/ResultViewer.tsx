@@ -2,11 +2,12 @@
 
 // Visualizador del texto extraído con acciones de copiar y descargar (RF-03).
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildFileName, downloadTextFile } from "@/lib/download";
 import { CheckIcon, CopyIcon, DownloadIcon } from "./Icons";
 
 interface ResultViewerProps {
   text: string;
-  /** Nombre del archivo original, usado para nombrar la descarga .txt. */
+  /** Nombre del archivo original, usado para nombrar la descarga .md. */
   sourceName: string;
   onReset: () => void;
 }
@@ -35,15 +36,7 @@ export function ResultViewer({ text, sourceName, onReset }: ResultViewerProps) {
   }, [text]);
 
   const handleDownload = useCallback(() => {
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = buildTxtName(sourceName);
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadTextFile(text, buildFileName(sourceName, ".md"));
   }, [text, sourceName]);
 
   return (
@@ -74,11 +67,11 @@ export function ResultViewer({ text, sourceName, onReset }: ResultViewerProps) {
           <button
             type="button"
             onClick={handleDownload}
-            aria-label="Descargar como archivo de texto"
+            aria-label="Descargar como archivo Markdown"
             className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <DownloadIcon className="h-4 w-4" />
-            <span>Descargar .txt</span>
+            <span>Descargar .md</span>
           </button>
         </div>
       </div>
@@ -99,10 +92,4 @@ export function ResultViewer({ text, sourceName, onReset }: ResultViewerProps) {
       </button>
     </div>
   );
-}
-
-/** Reemplaza la extensión .pdf por .txt (o la añade si no la tiene). */
-function buildTxtName(sourceName: string): string {
-  const base = sourceName.replace(/\.pdf$/i, "");
-  return `${base || "documento"}.txt`;
 }

@@ -43,11 +43,10 @@ export async function requestPresignedUrl(
   }
 
   const data = (await response.json()) as Partial<PresignResponse>;
-  console.log("Respuesta de presign", data);
-  if (!data.uploadUrl) {
+  if (!data.uploadUrl || !data.downloadUrl) {
     throw new ScanError("server", "Respuesta inválida del servidor.");
   }
-  return { uploadUrl: data.uploadUrl };
+  return { uploadUrl: data.uploadUrl, downloadUrl: data.downloadUrl };
 }
 
 /**
@@ -115,14 +114,80 @@ export function uploadToS3(
 }
 
 /**
- * Paso final: obtiene el texto extraído del documento.
- *
- * El backend real no expone un endpoint de resultado, por lo que la subida a S3
- * es el último paso del flujo real y esta función devuelve `null` (la UI muestra
- * una confirmación de subida). En modo demostración se devuelve texto simulado
- * para poder probar el visor de resultados.
+ * Paso final (modo demostración): devuelve texto simulado para poder probar el
+ * visor de resultados sin backend real.
  */
-export function getExtractedText(signal: AbortSignal): Promise<string | null> {
-  if (USE_MOCK) return mockResult(signal);
-  return Promise.resolve(null);
+export function getExtractedText(signal: AbortSignal): Promise<string> {
+  return mockResult(signal);
+}
+
+/**
+ * Paso final (flujo real): descarga el documento convertido a Markdown desde la
+ * URL pre-firmada devuelta por la Lambda firmadora.
+ *
+ * El objeto `.md` no existe inmediatamente: el backend lo genera de forma
+ * asíncrona tras la subida del PDF. Mientras tanto S3 responde 403/404 a la URL
+ * pre-firmada, así que se sondea con reintentos hasta que el documento esté
+ * disponible (o se agote el presupuesto de tiempo, manteniéndose por debajo de
+ * la expiración de ~10 min de la URL).
+ */
+export async function fetchConvertedMarkdown(
+  downloadUrl: string,
+  signal: AbortSignal,
+): Promise<string> {
+  const INITIAL_DELAY_MS = 3000; // Margen tras la subida antes de descargar el .md.
+  const POLL_INTERVAL_MS = 2000;
+  const MAX_ATTEMPTS = 60; // ~3 min de sondeo, dentro de la expiración de la URL.
+
+  // Espera inicial entre la subida del PDF y el primer intento de descarga,
+  // dando margen a que el backend empiece a generar el documento convertido.
+  await delay(INITIAL_DELAY_MS, signal);
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (signal.aborted) throw new ScanError("unknown", "Proceso cancelado.");
+
+    let response: Response;
+    try {
+      response = await fetch(downloadUrl, { method: "GET", signal });
+    } catch {
+      if (signal.aborted) throw new ScanError("unknown", "Proceso cancelado.");
+      throw new ScanError(
+        "network",
+        "No se pudo descargar el documento convertido. Verifica tu conexión.",
+      );
+    }
+
+    if (response.ok) return response.text();
+
+    // 403/404: la conversión aún no terminó; esperar y reintentar.
+    if (response.status === 403 || response.status === 404) {
+      await delay(POLL_INTERVAL_MS, signal);
+      continue;
+    }
+
+    throw new ScanError(
+      "server",
+      `No se pudo descargar el documento convertido (código ${response.status}).`,
+    );
+  }
+
+  throw new ScanError(
+    "timeout",
+    "El procesamiento del documento tardó demasiado. Inténtalo de nuevo.",
+  );
+}
+
+/** Espera `ms` milisegundos, abortable mediante la señal del flujo. */
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new ScanError("unknown", "Proceso cancelado."));
+      },
+      { once: true },
+    );
+  });
 }

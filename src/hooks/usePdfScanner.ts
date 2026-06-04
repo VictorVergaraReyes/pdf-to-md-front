@@ -3,8 +3,14 @@
 // Hook que orquesta toda la máquina de estados del flujo de escaneo:
 // selección → subida (progreso) → procesamiento → resultado / error.
 import { useCallback, useRef, useState } from "react";
-import { getExtractedText, requestPresignedUrl, uploadToS3 } from "@/lib/api";
+import {
+  fetchConvertedMarkdown,
+  getExtractedText,
+  requestPresignedUrl,
+  uploadToS3,
+} from "@/lib/api";
 import { USE_MOCK } from "@/lib/config";
+import { buildFileName, downloadTextFile } from "@/lib/download";
 import { ScanError, ScanErrorCode, ScanStatus } from "@/lib/types";
 import { validatePdfFile } from "@/lib/validation";
 
@@ -67,7 +73,10 @@ export function usePdfScanner() {
     try {
       setState((s) => ({ ...s, status: "uploading", progress: 0, error: null }));
 
-      const { uploadUrl } = await requestPresignedUrl(file.name, signal);
+      const { uploadUrl, downloadUrl } = await requestPresignedUrl(
+        file.name,
+        signal,
+      );
 
       await uploadToS3(
         uploadUrl,
@@ -76,13 +85,19 @@ export function usePdfScanner() {
         signal,
       );
 
-      // Solo el modo demostración simula una fase de procesamiento con texto
-      // extraído; en el flujo real la subida a S3 es el último paso.
-      if (USE_MOCK) {
-        setState((s) => ({ ...s, status: "processing" }));
-      }
+      // Tras la subida, el backend convierte el PDF a Markdown de forma
+      // asíncrona; mientras tanto mostramos la fase de procesamiento.
+      setState((s) => ({ ...s, status: "processing" }));
 
-      const text = await getExtractedText(signal);
+      // En demostración se simula el OCR; en el flujo real se descarga el
+      // documento convertido (.md) desde la URL pre-firmada, sondeándola hasta
+      // que esté disponible.
+      const text = USE_MOCK
+        ? await getExtractedText(signal)
+        : await fetchConvertedMarkdown(downloadUrl, signal);
+
+      // Descarga automática del documento convertido a Markdown.
+      downloadTextFile(text, buildFileName(file.name, ".md"));
 
       setState((s) => ({ ...s, status: "done", text }));
     } catch (err) {

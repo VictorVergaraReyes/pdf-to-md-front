@@ -6,7 +6,11 @@ import type { ProgressCallback } from "./api";
 
 export function mockPresign(): Promise<PresignResponse> {
   return new Promise((resolve) =>
-    setTimeout(() => resolve({ uploadUrl: "mock://s3" }), 400),
+    setTimeout(
+      () =>
+        resolve({ uploadUrl: "mock://s3", downloadUrl: "mock://converted.md" }),
+      400,
+    ),
   );
 }
 
