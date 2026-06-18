@@ -25,7 +25,7 @@ export async function requestPresignedUrl(
     const url = new URL(PRESIGN_ENDPOINT);
     url.searchParams.set("fileName", fileName);
     response = await fetch(url.toString(), {
-      method: "GET",
+      method: "POST",
       signal,
     });
   } catch {
