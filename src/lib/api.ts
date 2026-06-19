@@ -64,7 +64,7 @@ export function uploadToS3(
 
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUrl, true);
+    xhr.open("POST", uploadUrl, true);
     xhr.setRequestHeader("Content-Type", ACCEPTED_MIME);
 
     xhr.upload.onprogress = (event) => {
