@@ -33,8 +33,10 @@ export class ScanError extends Error {
 
 /** Respuesta de la Lambda firmadora con las URLs temporales del flujo. */
 export interface PresignResponse {
-  /** URL pre-firmada para hacer PUT directo a S3 (subida del PDF). */
+  /** URL base del bucket S3 para hacer POST multipart firmado. */
   uploadUrl: string;
+  /** Campos firmados que deben incluirse en el FormData del POST a S3. */
+  uploadFields: Record<string, string>;
   /**
    * URL pre-firmada para descargar el documento convertido a Markdown (.md).
    * Se genera al mismo tiempo que `uploadUrl`, pero el objeto `.md` solo existe

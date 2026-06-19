@@ -73,17 +73,16 @@ export function usePdfScanner() {
     try {
       setState((s) => ({ ...s, status: "uploading", progress: 0, error: null }));
 
-      const { uploadUrl, downloadUrl } = await requestPresignedUrl(
+      const { uploadUrl, uploadFields, downloadUrl } = await requestPresignedUrl(
         file.name,
         signal,
       );
 
-      await uploadToS3(
-        uploadUrl,
-        file,
-        (percent) => setState((s) => ({ ...s, progress: percent })),
-        signal,
-      );
+      const onProgress = (progress: number) => {
+        setState((s) => ({ ...s, progress }));
+      };
+
+      await uploadToS3(uploadUrl, uploadFields, file, onProgress, signal)
 
       // Tras la subida, el backend convierte el PDF a Markdown de forma
       // asíncrona; mientras tanto mostramos la fase de procesamiento.

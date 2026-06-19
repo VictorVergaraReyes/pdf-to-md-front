@@ -43,10 +43,10 @@ export async function requestPresignedUrl(
   }
 
   const data = (await response.json()) as Partial<PresignResponse>;
-  if (!data.uploadUrl || !data.downloadUrl) {
+  if (!data.uploadUrl || !data.uploadFields || !data.downloadUrl) {
     throw new ScanError("server", "Respuesta inválida del servidor.");
   }
-  return { uploadUrl: data.uploadUrl, downloadUrl: data.downloadUrl };
+  return { uploadUrl: data.uploadUrl, uploadFields: data.uploadFields, downloadUrl: data.downloadUrl };
 }
 
 /**
@@ -56,6 +56,7 @@ export async function requestPresignedUrl(
  */
 export function uploadToS3(
   uploadUrl: string,
+  uploadFields: Record<string, string>,  // campos que regresa Lambda
   file: File,
   onProgress: ProgressCallback,
   signal: AbortSignal,
@@ -63,9 +64,20 @@ export function uploadToS3(
   if (USE_MOCK) return mockUpload(onProgress, signal);
 
   return new Promise<void>((resolve, reject) => {
+    // Construir el FormData con los campos de S3
+    const formData = new FormData();
+
+    // Agregar todos los campos firmados primero
+    Object.entries(uploadFields).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    // El archivo SIEMPRE debe ser el último campo
+    formData.append("file", file);
+
     const xhr = new XMLHttpRequest();
     xhr.open("POST", uploadUrl, true);
-    xhr.setRequestHeader("Content-Type", ACCEPTED_MIME);
+    // ⚠️ NO setear Content-Type — el navegador lo pone automáticamente con el boundary
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -78,7 +90,6 @@ export function uploadToS3(
         onProgress(100);
         resolve();
       } else if (xhr.status === 403) {
-        // S3 devuelve 403 cuando la URL pre-firmada expiró o es inválida.
         reject(
           new ScanError(
             "url_expired",
@@ -106,10 +117,10 @@ export function uploadToS3(
     xhr.onabort = () =>
       reject(new ScanError("unknown", "Subida cancelada."));
 
-    // Permite cancelar la subida desde la UI.
     signal.addEventListener("abort", () => xhr.abort(), { once: true });
 
-    xhr.send(file);
+    // ✅ Enviar el FormData en lugar del archivo directo
+    xhr.send(formData);
   });
 }
 
