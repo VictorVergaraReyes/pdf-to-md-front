@@ -8,7 +8,20 @@ export function mockPresign(): Promise<PresignResponse> {
   return new Promise((resolve) =>
     setTimeout(
       () =>
-        resolve({ uploadUrl: "mock://s3", downloadUrl: "mock://converted.md" }),
+        resolve({
+          uploadUrl: "mock://s3",
+          uploadFields: {
+            key: "uploads/mock.pdf",
+            "Content-Type": "application/pdf",
+            policy: "mock-policy",
+            "x-amz-algorithm": "AWS4-HMAC-SHA256",
+            "x-amz-credential": "mock-credential",
+            "x-amz-date": "20260101T000000Z",
+            "x-amz-security-token": "mock-token",
+            "x-amz-signature": "mock-signature"
+          },
+          downloadUrl: "mock://converted.md"
+        }),
       400,
     ),
   );
